@@ -65,7 +65,6 @@ class Dispatcher:
         self.done = asyncio.Event()
         self.failed = False
 
-    # ------------------------------------------------------------------ startup
     async def connect(self) -> None:
         while True:
             try:
@@ -82,7 +81,6 @@ class Dispatcher:
         log.info("%s; sim_now=%s", "resumed from DB" if self.store.resumed else "fresh start",
                  self.clock.now().isoformat())
 
-    # ------------------------------------------------------------------ main loop
     async def run(self) -> None:
         """Scheduling loop. If it dies, take the whole process down (exit 1) so a supervisor
         restarts it, rather than leaving a webhook server up with nothing dispatching."""
@@ -139,7 +137,6 @@ class Dispatcher:
             self.last_poll[sid] = now
             self.spawn(key, self.poll_call(sid))
 
-    # ------------------------------------------------------------------ provider calls
     async def dial(self, c, rid: str) -> None:
         # Re-check the window right before sending. The loop decided a moment ago, and at high
         # --speed a few ms of event-loop delay is many simulated seconds.
@@ -192,7 +189,6 @@ class Dispatcher:
             log.info("poll %s: ended without a webhook, recovered", sid)
             self.store.record_call(r.json())
 
-    # ------------------------------------------------------------------ webhooks
     def verify(self, raw: bytes, signature: str | None) -> bool:
         expected = hmac.new(self.secret, raw, hashlib.sha256).hexdigest()
         return signature is not None and hmac.compare_digest(expected, signature)

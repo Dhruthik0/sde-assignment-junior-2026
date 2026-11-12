@@ -61,7 +61,7 @@ class Store:
         self.db = sqlite3.connect(path, isolation_level=None)  # we manage transactions ourselves
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=NORMAL")  # WAL + NORMAL survives kill -9; FULL only adds power-loss safety
+        self.db.execute("PRAGMA synchronous=NORMAL")  # enough for kill -9; FULL adds power-loss safety
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
         row = self.db.execute("SELECT value FROM meta WHERE key='world'").fetchone()
@@ -89,7 +89,6 @@ class Store:
             self.db.execute("ROLLBACK")
             raise
 
-    # ------------------------------------------------------------------ transitions
     def begin_dial(self, campaign_id: str, lead_id: str) -> str | None:
         """Commit to dialling before we send anything. The request_id is deterministic per
         (lead, attempt number), so re-sending it after a crash or 504 can never place a 2nd call."""
@@ -103,7 +102,7 @@ class Store:
         return rid if cur.rowcount else None
 
     def abort_dial(self, request_id: str) -> None:
-        """The provider confirmed this request did not place a call (503, or 404 on lookup)."""
+        """This request placed no call (503, 404 on lookup, a rejection, or the window closed first)."""
         with self.tx():
             row = self.db.execute("SELECT campaign_id, lead_id FROM leads WHERE request_id=?",
                                   (request_id,)).fetchone()
@@ -171,7 +170,6 @@ class Store:
         self.db.execute("UPDATE leads SET state=?, kind=?, ready_at=?, request_id=? "
                         "WHERE campaign_id=? AND lead_id=?", (state, kind, ready, rid, cid, lid))
 
-    # ------------------------------------------------------------------ queries
     def pending(self) -> list[Candidate]:
         return [Candidate(r["campaign_id"], r["lead_id"], r["tenant_id"], r["phone"], r["kind"],
                           dt(r["ready_at"]))

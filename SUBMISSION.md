@@ -1,9 +1,9 @@
 # Submission
 
 ## Candidate
-- **Name:** Dhruthik0
+- **Name:** Dhruthik
 - **Assignment chosen:** B (Workflow): Durable Campaign Dispatcher
-- **Time spent (honest estimate):** _fill in_
+- **Time spent (honest estimate):** about 6h
 
 ## How to run
 ```bash
