@@ -148,6 +148,8 @@ def test_webhook_signature_and_idempotency(make):
             for _ in range(2):  # duplicate delivery
                 assert (await post(raw, sig)).status_code == 200
             assert (await post(bad, bad_sig)).status_code == 400
+            for junk in (b"not json", b"[1, 2]", b'"str"', b"null"):  # signed, but not a call object
+                assert (await post(junk, hmac.new(SECRET.encode(), junk, hashlib.sha256).hexdigest())).status_code == 400
     asyncio.run(scenario())
     assert lead_state(d)["state"] == "pending"
     assert d.store.final_rows()[0]["attempts"] == 1

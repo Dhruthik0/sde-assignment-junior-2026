@@ -1,1 +1,5 @@
 run*/
+*.db-wal
+*.db-shm
+*.db.lock
+*.tmp

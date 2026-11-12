@@ -141,3 +141,18 @@ def test_busy_counts_dialing_and_active(store):
     accept(store, "ca", "a2", rid)
     phones, active = store.busy()
     assert phones == {SHARED, "+919000000002"} and active == {"t1": 2}
+
+
+def test_final_state_csv_contract(store, tmp_path):
+    # a2: two attempts; last_status/disposition must come from the most recently *ended* call.
+    dial(store, "ca", "a2", "no_answer", ended="2026-11-12T10:05:00+05:30")
+    dial(store, "ca", "a2", "completed", "callback_requested", ended="2026-11-12T11:10:00+05:30",
+         callback_at="2026-11-12T13:00:00+05:30")
+    out = tmp_path / "final_state.csv"
+    store.write_final_state(str(out))
+    assert out.read_text().splitlines() == [
+        "campaign_id,lead_id,final_state,attempts,last_status,last_disposition",
+        "ca,a1,pending,0,,",            # no ended call: both columns empty
+        "ca,a2,pending,2,completed,callback_requested",
+        "cb,b1,pending,0,,",            # sorted by campaign_id, then lead_id
+    ]

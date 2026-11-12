@@ -218,7 +218,7 @@ def create_app(d: Dispatcher) -> FastAPI:
             return JSONResponse({"error": "starting"}, status_code=503)
         try:
             d.store.record_call(json.loads(raw))
-        except (ValueError, KeyError, TypeError) as e:  # bad JSON, missing field, unknown lead
+        except (ValueError, KeyError, TypeError, AttributeError) as e:  # bad JSON, not an object, missing field, unknown lead
             log.error("webhook rejected: %r", e)  # don't log the body: it contains the phone (PII)
             return JSONResponse({"error": "bad_request"}, status_code=400)
         return {"ok": True}

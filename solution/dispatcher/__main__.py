@@ -1,6 +1,7 @@
 """Run the dispatcher:  python -m dispatcher [--provider URL] [--port 8200] [--db dispatcher.db]"""
 import argparse
 import asyncio
+import fcntl
 import json
 import logging
 import os
@@ -27,6 +28,15 @@ def main():
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # One dispatcher per DB: two would each fill the same free tenant slots (R2). The kernel drops
+    # the lock when the process dies, even on kill -9, so a restart never finds a stale lock.
+    lock = open(a.db + ".lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        logging.error("another dispatcher is already running on %s; exiting", a.db)
+        sys.exit(2)
 
     with open(a.fixtures) as f:
         cfg = json.load(f)
