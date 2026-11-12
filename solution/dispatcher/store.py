@@ -1,8 +1,8 @@
 """SQLite-backed lead state machine.
 
-The `calls` table holds facts the provider told us (a call was accepted, a call ended). A lead's
-state is never set directly by callers: `_refresh` recomputes it from those facts plus the lead's
-in-flight `request_id`. Facts only ever get added, so applying the same fact twice (duplicate
+The `calls` table holds facts the provider told us (a call was accepted, a call ended). Callers
+only record facts or start/abort a dial; after each, `_refresh` recomputes the lead's state from
+those facts plus the lead's in-flight `request_id`. Facts only ever get added, so applying the same fact twice (duplicate
 webhook, webhook + poll, replay after a crash) produces the same state.
 """
 from __future__ import annotations
@@ -61,7 +61,7 @@ class Store:
         self.db = sqlite3.connect(path, isolation_level=None)  # we manage transactions ourselves
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=FULL")
+        self.db.execute("PRAGMA synchronous=NORMAL")  # WAL + NORMAL survives kill -9; FULL only adds power-loss safety
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
         row = self.db.execute("SELECT value FROM meta WHERE key='world'").fetchone()

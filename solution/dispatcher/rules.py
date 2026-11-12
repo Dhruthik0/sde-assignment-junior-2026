@@ -14,10 +14,16 @@ TERMINAL = frozenset({"interested", "not_interested", "wrong_number", "dnd"})
 FINAL_STATES = frozenset({"completed", "exhausted", "dnd_blocked"})
 KIND_RANK = {"callback": 0, "retry": 1, "fresh": 2}  # R6: callbacks > retries > fresh
 
-# Don't start a call in the last 20 s of a window: our request reaches the provider a little after
-# we decide (at 600x, 1 ms of real latency is 0.6 simulated seconds). Kept small so a callback due
-# in the window's last minute is still honoured that day.
+# Don't start a call in the last stretch of a window: our request reaches the provider a little
+# after we decide, and every real millisecond is `speed` simulated milliseconds. The margin is
+# 20 s or 50 ms of real time, whichever is larger (30 s at the default 600x), so a callback due in a
+# window's last minute is still honoured that day.
 END_MARGIN = timedelta(seconds=20)
+REAL_LATENCY_BUDGET_S = 0.05
+
+
+def end_margin(speed: float) -> timedelta:
+    return max(END_MARGIN, timedelta(seconds=REAL_LATENCY_BUDGET_S * speed))
 
 
 @dataclass(frozen=True)
@@ -25,13 +31,14 @@ class Window:
     start: time
     end: time
     days: frozenset[str]
+    margin: timedelta = END_MARGIN  # no call starts in the last `margin` before `end`
 
     @classmethod
-    def build(cls, campaign: dict, regulatory: dict) -> "Window":
+    def build(cls, campaign: dict, regulatory: dict, margin: timedelta = END_MARGIN) -> "Window":
         """Campaign window intersected with the regulatory window (R1)."""
         return cls(start=max(_hm(campaign["start"]), _hm(regulatory["start"])),
                    end=min(_hm(campaign["end"]), _hm(regulatory["end"])),
-                   days=frozenset(campaign["days"]))
+                   days=frozenset(campaign["days"]), margin=margin)
 
 
 def _hm(s: str) -> time:
@@ -39,22 +46,23 @@ def _hm(s: str) -> time:
     return time(int(h), int(m))
 
 
-def next_open(w: Window, t: datetime, margin: timedelta = END_MARGIN) -> datetime:
-    """Earliest instant >= t at which a call may be started in window `w`."""
+def next_open(w: Window, t: datetime) -> datetime | None:
+    """Earliest instant >= t at which a call may be started in window `w`, or None if the window
+    can never open (no days, or the campaign window lies outside the regulatory one)."""
     lt = t.astimezone(IST)
     for d in range(8):
         day = (lt + timedelta(days=d)).date()
         if DAYS[day.weekday()] not in w.days:
             continue
-        start = datetime.combine(day, w.start, IST)
-        end = datetime.combine(day, w.end, IST) - margin
-        if lt < end:
-            return max(lt, start)
-    raise ValueError(f"window {w} never opens")
+        candidate = max(lt, datetime.combine(day, w.start, IST))
+        if candidate < datetime.combine(day, w.end, IST) - w.margin:
+            return candidate
+    return None
 
 
 def is_open(w: Window, now: datetime) -> bool:
-    return next_open(w, now) <= now
+    nxt = next_open(w, now)
+    return nxt is not None and nxt <= now
 
 
 def next_attempt(last: dict | None, retry_policy: dict) -> tuple[str, datetime | None]:

@@ -116,6 +116,8 @@ def test_exhausted_beats_dnd_blocked(store):
 
 
 def test_dnd_waits_for_active_call_on_other_lead(store):
+    # Defensive: R3 means the dispatcher never has two leads on one phone active at once, but the
+    # derivation must still give the right answer if it ever happened.
     rid = store.begin_dial("cb", "b1")
     sid = accept(store, "cb", "b1", rid)
     dial(store, "ca", "a1", "completed", "dnd", phone=SHARED)

@@ -30,6 +30,15 @@ def test_window_start_inclusive_end_exclusive_with_margin():
     assert not is_open(ZEN, at(13, 18, 0))
 
 
+def test_end_margin_scales_with_speed():
+    from dispatcher.rules import end_margin
+    assert end_margin(300) == timedelta(seconds=20)
+    assert end_margin(600) == timedelta(seconds=30)
+    assert end_margin(12000) == timedelta(minutes=10)
+    fast = Window.build({"start": "09:30", "end": "18:00", "days": WEEKDAYS}, REG, end_margin(12000))
+    assert is_open(fast, at(13, 17, 49, 59)) and not is_open(fast, at(13, 17, 50))
+
+
 def test_window_respects_days():
     assert not is_open(ZEN, at(14, 12))       # Saturday
     assert is_open(ALL_DAY, at(14, 12))
@@ -43,6 +52,13 @@ def test_next_open_same_day_and_weekend_rollover():
     assert next_open(ZEN, at(13, 7)) == at(13, 9, 30)
     assert next_open(ZEN, at(13, 12)) == at(13, 12)
     assert next_open(ZEN, at(13, 18, 30)) == at(16, 9, 30)  # Fri evening -> Mon morning
+
+
+def test_window_outside_regulatory_hours_never_opens():
+    early = Window.build({"start": "06:00", "end": "08:30", "days": WEEKDAYS}, REG)
+    assert next_open(early, at(13, 7)) is None
+    assert not is_open(early, at(13, 9, 0))
+    assert next_open(Window.build({"start": "10:00", "end": "18:00", "days": []}, REG), at(13, 7)) is None
 
 
 # ------------------------------------------------------------------ next eligible time (R5, R6)
