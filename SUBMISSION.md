@@ -218,6 +218,20 @@ the window again with a fresh clock reading right before sending.
   `chaos.sh`, whose logs show polls recovering lost webhooks).
 
 ## Results
+`/admin/report` from a fresh clone of this repo, run with the exact commands above (mock
+`--seed 2468`, default speed and failures). The dispatcher was hit with `kill -9` 45 s in, then
+restarted. Only the `violations` list (empty) is left out:
+```json
+{"calls_total": 421, "calls_active": 0,
+ "calls_by_status": {"busy": 54, "completed": 225, "failed": 22, "no_answer": 120},
+ "violation_count": 0, "violations_by_type": {},
+ "max_concurrency_seen": {"acme_insurance": 4, "zen_retail": 3},
+ "callback_lateness_minutes": {"count": 74, "p50": 0.2, "p90": 1.2, "max": 21.2},
+ "webhooks": {"delivered": 446, "duplicates": 35, "lost": 10}}
+```
+`final_state.csv` vs `/admin/leads`: 200 leads, 0 mismatches. `git status` was still clean
+afterwards: the DB, WAL, lock and CSV are all ignored.
+
 All runs below used the final code. Each started a fresh mock, ran the dispatcher to completion,
 then checked `/admin/report` and diffed `final_state.csv` against `/admin/leads`. The default
 case is `solution/chaos.sh 3 1 2026`. Most others used the same script with its `SPEED`,
